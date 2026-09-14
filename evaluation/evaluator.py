@@ -1,6 +1,7 @@
 """Roda o pipeline sobre o dataset de teste e monta o relatório de avaliação."""
 
 import json
+from collections import Counter
 
 from evaluation.metrics import calcular_metricas
 from main import construir_grafo, processar_documento
@@ -18,6 +19,8 @@ def avaliar_pipeline(app, casos: list[dict]) -> dict:
     tokens_output_por_agente = {"extrator": 0, "validador": 0, "decisao": 0}
     latencias_totais_ms: list[float] = []
     resultados_por_caso = []
+    modelos_extrator: Counter = Counter()
+    revisoes_disparadas = 0
 
     for caso in casos:
         resultado = processar_documento(app, caso["documento"])
@@ -33,6 +36,10 @@ def avaliar_pipeline(app, casos: list[dict]) -> dict:
         for agente, trace in final.traces.items():
             tokens_input_por_agente[agente] += trace.tokens_input
             tokens_output_por_agente[agente] += trace.tokens_output
+
+        modelos_extrator[final.traces["extrator"].model_id] += 1
+        if final.reflexao is not None and final.reflexao.recomendacao == "revisar":
+            revisoes_disparadas += 1
 
         latencias_totais_ms.append(final.metricas_globais.latencia_total_ms)
 
@@ -74,6 +81,8 @@ def avaliar_pipeline(app, casos: list[dict]) -> dict:
         "custo_total": sum(custo_por_agente.values()),
         "agente_com_maior_custo": agente_com_maior_custo,
         "latencia_media_por_caso_ms": sum(latencias_totais_ms) / len(latencias_totais_ms),
+        "modelos_extrator": dict(modelos_extrator),
+        "revisoes_disparadas": revisoes_disparadas,
     }
 
 

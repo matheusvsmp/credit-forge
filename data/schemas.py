@@ -42,12 +42,21 @@ class DecisionResult(BaseModel):
     confianca: float = Field(ge=0.0, le=1.0)
 
 
+class ReflexaoResult(BaseModel):
+    """Saída do self-reflection loop: crítica de outro agente sobre uma decisão já tomada."""
+
+    confianca: float = Field(ge=0.0, le=1.0)
+    achados_contraditorios: list[str] = Field(default_factory=list)
+    recomendacao: Literal["aceitar", "rejeitar", "revisar"]
+
+
 class AgentTrace(BaseModel):
     """Metadados de observabilidade de UM agente numa execução."""
 
     tokens_input: int = Field(ge=0)
     tokens_output: int = Field(ge=0)
     latencia_ms: float = Field(ge=0.0)
+    model_id: str = "claude-haiku-4-5"
 
     @property
     def tokens(self) -> int:
@@ -72,6 +81,7 @@ class ConsolidatedResult(BaseModel):
     extracao: ExtractionResult
     validacao: ValidationResult
     decisao: DecisionResult
+    reflexao: ReflexaoResult | None = None
     traces: dict[str, AgentTrace]
     metricas_globais: MetricasGlobais
 

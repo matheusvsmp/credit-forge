@@ -89,8 +89,10 @@ def agente_extrator_real(
     documento: str,
     client: anthropic.Anthropic,
     verificador: VerificadorOrcamento,
+    contexto_memoria: str = "",
+    model_id: str = MODEL_ID,
 ) -> tuple[ExtractionResult, dict]:
-    """Extrai campos estruturados chamando o Claude (Haiku 4.5) de verdade.
+    """Extrai campos estruturados chamando o Claude de verdade.
 
     Devolve (resultado, info_uso). `info_uso` traz tokens_input/tokens_output
     reais da resposta da API -- usado pelo consolidador para montar o
@@ -99,19 +101,45 @@ def agente_extrator_real(
     `verificador` registra o custo desta chamada e interrompe a execução
     (OrcamentoExcedidoError) se o gasto acumulado no processo ultrapassar o
     limite configurado.
+
+    `contexto_memoria` (opcional): resumo de casos já processados nesta
+    mesma sessão (ver agents/memory.py) -- injetado como contexto extra.
+
+    `model_id` (opcional): por padrão usa Haiku 4.5; o Model Router
+    (agents/routing.py) pode passar "claude-sonnet-5" para casos complexos.
     """
+    conteudo = f"Analise:\n{documento}"
+    if contexto_memoria:
+        conteudo = (
+            f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
+            f"[Documento atual a analisar]:\n{documento}"
+        )
+
+    # Sonnet 5 tende a ser mais verboso (ex: nomes completos, mais cuidado
+    # com casos ambíguos) do que Haiku -- por isso usamos um teto maior nele,
+    # mesmo a saída sendo "só" um JSON curto.
+    max_tokens = 300 if model_id == MODEL_ID else 600
+
     response = client.messages.create(
-        model=MODEL_ID,
-        max_tokens=300,  # saída é um JSON curto (~7 campos); evita gasto desnecessário
+        model=model_id,
+        max_tokens=max_tokens,
         system=SYSTEM_PROMPT_EXTRATOR,
-        messages=[{"role": "user", "content": f"Analise:\n{documento}"}],
+        messages=[{"role": "user", "content": conteudo}],
     )
 
     custo = estimar_custo(
         tokens_input=response.usage.input_tokens,
         tokens_output=response.usage.output_tokens,
+        model_id=model_id,
     )
     verificador.registrar(custo)
+
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError(
+            f"Resposta do extrator ({model_id}) foi cortada por atingir "
+            "max_tokens -- aumente o limite em vez de tentar parsear um "
+            "JSON incompleto."
+        )
 
     texto = next(b.text for b in response.content if b.type == "text")
     dados = json.loads(limpar_json_da_resposta(texto))

@@ -3,11 +3,15 @@
 import time
 from contextlib import contextmanager
 
-# Pricing público do Claude Haiku 4.5 (USD por 1 milhão de tokens) -- o modelo
-# mais barato da Anthropic, escolhido de propósito para este projeto de estudo
-# com orçamento de créditos limitado. Ajuste aqui se trocar de modelo.
-PRECO_INPUT_POR_1M_TOKENS = 1.00
-PRECO_OUTPUT_POR_1M_TOKENS = 5.00
+# Pricing público da Anthropic (USD por 1 milhão de tokens), por modelo.
+# Haiku 4.5 é o padrão deste projeto (barato); Sonnet 5 entra em cena só
+# quando o Model Router (agents/routing.py) decide que o caso é complexo
+# o suficiente para justificar o custo maior.
+PRECOS_POR_MODELO = {
+    "claude-haiku-4-5": {"input": 1.00, "output": 5.00},
+    "claude-sonnet-5": {"input": 2.00, "output": 10.00},
+}
+MODELO_PADRAO = "claude-haiku-4-5"
 
 
 @contextmanager
@@ -27,10 +31,15 @@ def medir_latencia():
         dados["latencia_ms"] = (time.perf_counter() - inicio) * 1000
 
 
-def estimar_custo(tokens_input: int, tokens_output: int) -> float:
-    """Estima custo em USD a partir de tokens de entrada/saída de UMA chamada."""
-    custo_input = (tokens_input / 1_000_000) * PRECO_INPUT_POR_1M_TOKENS
-    custo_output = (tokens_output / 1_000_000) * PRECO_OUTPUT_POR_1M_TOKENS
+def estimar_custo(
+    tokens_input: int, tokens_output: int, model_id: str = MODELO_PADRAO
+) -> float:
+    """Estima custo em USD de UMA chamada, usando o preço do `model_id` informado."""
+    precos = PRECOS_POR_MODELO.get(model_id)
+    if precos is None:
+        raise ValueError(f"Preço não configurado para o modelo {model_id!r}")
+    custo_input = (tokens_input / 1_000_000) * precos["input"]
+    custo_output = (tokens_output / 1_000_000) * precos["output"]
     return custo_input + custo_output
 
 

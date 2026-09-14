@@ -64,18 +64,27 @@ def agente_validador_real(
     extracao: ExtractionResult,
     client: anthropic.Anthropic,
     verificador: VerificadorOrcamento,
+    contexto_memoria: str = "",
 ) -> tuple[ValidationResult, dict]:
-    """Valida coerência dos dados extraídos chamando o Claude (Haiku 4.5) de verdade."""
+    """Valida coerência dos dados extraídos chamando o Claude (Haiku 4.5) de verdade.
+
+    `contexto_memoria` (opcional): resumo de casos já processados nesta
+    mesma sessão (ver agents/memory.py) -- injetado como contexto extra.
+    """
 
     dados_extraidos = extracao.model_dump_json(indent=2)
+    conteudo = f"Dados extraídos:\n{dados_extraidos}"
+    if contexto_memoria:
+        conteudo = (
+            f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
+            f"[Dados extraídos do caso atual]:\n{dados_extraidos}"
+        )
 
     response = client.messages.create(
         model=MODEL_ID,
         max_tokens=300,
         system=SYSTEM_PROMPT_VALIDADOR,
-        messages=[
-            {"role": "user", "content": f"Dados extraídos:\n{dados_extraidos}"}
-        ],
+        messages=[{"role": "user", "content": conteudo}],
     )
 
     custo = estimar_custo(

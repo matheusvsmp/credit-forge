@@ -6,11 +6,16 @@ MODEL_ID = "claude-haiku-4-5"
 
 
 def limpar_json_da_resposta(texto: str) -> str:
-    """Remove cercas de markdown (```json ... ```) que o modelo às vezes usa,
-    mesmo quando instruído a responder em JSON puro."""
+    """Corrige as duas formas mais comuns de o modelo "quase" acertar o JSON:
+    1) envolver a resposta em cercas de markdown (```json ... ```);
+    2) escapar aspas simples com \\' -- válido em Python, mas INVÁLIDO em
+       JSON puro (JSON só permite \\", \\\\, \\/, \\b, \\f, \\n, \\r, \\t, \\u....).
+    """
     texto = texto.strip()
     if texto.startswith("```"):
         texto = texto.split("\n", 1)[1] if "\n" in texto else texto
         if texto.endswith("```"):
             texto = texto.rsplit("```", 1)[0]
-    return texto.strip()
+    texto = texto.strip()
+    texto = texto.replace("\\'", "'")
+    return texto
