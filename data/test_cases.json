@@ -1,0 +1,94 @@
+{
+  "test_cases": [
+    {
+      "id": 1,
+      "documento": "Empresa: Comercial Nortesul. Faturamento anual: R$ 5M. Anos no mercado: 10. Histórico de pagamento: 0 atrasos em 24 meses. Dívida atual: R$ 200k. Capital social: R$ 1M.",
+      "ground_truth_decisao": "Risco Baixo",
+      "motivo_esperado": "Empresa madura, faturamento alto, sem atrasos, baixa alavancagem"
+    },
+    {
+      "id": 2,
+      "documento": "Empresa: Startup ABC. Faturamento anual: R$ 0.5M. Anos no mercado: 1. Histórico de pagamento: 5 atrasos em 24 meses. Dívida atual: R$ 400k. Capital social: R$ 50k.",
+      "ground_truth_decisao": "Risco Alto",
+      "motivo_esperado": "Empresa muito jovem, muitos atrasos, dívida maior que o capital social"
+    },
+    {
+      "id": 3,
+      "documento": "Empresa: Tech Startup XYZ. Faturamento anual: R$ 2.5M. Anos no mercado: 3. Histórico de pagamento: 3 atrasos em 24 meses. Dívida atual: R$ 150k. Capital social: R$ 500k.",
+      "ground_truth_decisao": "Risco Médio",
+      "motivo_esperado": "Faturamento saudável, mas histórico de atrasos preocupante"
+    },
+    {
+      "id": 4,
+      "documento": "Empresa: Indústria Rio Verde. Faturamento anual: R$ 10M. Anos no mercado: 15. Histórico de pagamento: 1 atrasos em 24 meses. Dívida atual: R$ 500k. Capital social: R$ 3M.",
+      "ground_truth_decisao": "Risco Baixo",
+      "motivo_esperado": "Empresa consolidada, faturamento muito acima da dívida"
+    },
+    {
+      "id": 5,
+      "documento": "Empresa: Delivery Rápido Já. Faturamento anual: R$ 0.3M. Anos no mercado: 1. Histórico de pagamento: 6 atrasos em 24 meses. Dívida atual: R$ 250k. Capital social: R$ 20k.",
+      "ground_truth_decisao": "Risco Alto",
+      "motivo_esperado": "Faturamento baixo, muitos atrasos, capital social insuficiente frente à dívida"
+    },
+    {
+      "id": 6,
+      "documento": "Empresa: Móveis Bom Lar. Faturamento anual: R$ 1.8M. Anos no mercado: 4. Histórico de pagamento: 2 atrasos em 24 meses. Dívida atual: R$ 300k. Capital social: R$ 400k.",
+      "ground_truth_decisao": "Risco Médio",
+      "motivo_esperado": "Empresa ainda jovem, alavancagem moderada, poucos atrasos"
+    },
+    {
+      "id": 7,
+      "documento": "Empresa: Distribuidora Central. Faturamento anual: R$ 8M. Anos no mercado: 12. Histórico de pagamento: 0 atrasos em 24 meses. Dívida atual: R$ 100k. Capital social: R$ 2M.",
+      "ground_truth_decisao": "Risco Baixo",
+      "motivo_esperado": "Histórico limpo, dívida irrelevante frente ao porte da empresa"
+    },
+    {
+      "id": 8,
+      "documento": "Empresa: App Fácil Tech. Faturamento anual: R$ 0.4M. Anos no mercado: 2. Histórico de pagamento: 4 atrasos em 24 meses. Dívida atual: R$ 350k. Capital social: R$ 30k.",
+      "ground_truth_decisao": "Risco Alto",
+      "motivo_esperado": "Empresa pequena e jovem, dívida muito acima do capital social"
+    },
+    {
+      "id": 9,
+      "documento": "Empresa: Construtora Alvorada. Faturamento anual: R$ 3M. Anos no mercado: 5. Histórico de pagamento: 3 atrasos em 24 meses. Dívida atual: R$ 600k. Capital social: R$ 700k.",
+      "ground_truth_decisao": "Risco Médio",
+      "motivo_esperado": "Faturamento razoável, mas alavancagem alta e atrasos recorrentes"
+    },
+    {
+      "id": 10,
+      "documento": "Empresa: Farmácia Popular Saúde. Faturamento anual: R$ 6M. Anos no mercado: 9. Histórico de pagamento: 1 atrasos em 24 meses. Dívida atual: R$ 150k. Capital social: R$ 1.5M.",
+      "ground_truth_decisao": "Risco Baixo",
+      "motivo_esperado": "Empresa estável, poucos atrasos, dívida baixa frente ao capital"
+    },
+    {
+      "id": 11,
+      "documento": "Empresa: Moda Jovem Store. Faturamento anual: R$ 0.2M. Anos no mercado: 1. Histórico de pagamento: 7 atrasos em 24 meses. Dívida atual: R$ 180k. Capital social: R$ 10k.",
+      "ground_truth_decisao": "Risco Alto",
+      "motivo_esperado": "Empresa recém-criada, faturamento baixo e altíssimo número de atrasos"
+    },
+    {
+      "id": 12,
+      "documento": "Empresa: Gráfica Rápida Print. Faturamento anual: R$ 2M. Anos no mercado: 3. Histórico de pagamento: 2 atrasos em 24 meses. Dívida atual: R$ 400k. Capital social: R$ 350k.",
+      "ground_truth_decisao": "Risco Médio",
+      "motivo_esperado": "Empresa jovem, dívida próxima do capital social, atrasos moderados"
+    },
+    {
+      "id": 13,
+      "documento": "Empresa: Metalúrgica União Forte. Faturamento anual: R$ 12M. Anos no mercado: 20. Histórico de pagamento: 0 atrasos em 24 meses. Dívida atual: R$ 300k. Capital social: R$ 5M.",
+      "ground_truth_decisao": "Risco Baixo",
+      "motivo_esperado": "Empresa muito consolidada, sem nenhum atraso registrado"
+    },
+    {
+      "id": 14,
+      "documento": "Empresa: Pet Shop Amigo Fiel Franquias. Faturamento anual: R$ 0.6M. Anos no mercado: 2. Histórico de pagamento: 5 atrasos em 24 meses. Dívida atual: R$ 500k. Capital social: R$ 40k.",
+      "ground_truth_decisao": "Risco Alto",
+      "motivo_esperado": "Dívida muito acima do faturamento e do capital social, empresa jovem"
+    },
+    {
+      "id": 15,
+      "documento": "Empresa: Consultoria Ponto Certo. Faturamento anual: R$ 2.2M. Anos no mercado: 4. Histórico de pagamento: 3 atrasos em 24 meses. Dívida atual: R$ 350k. Capital social: R$ 450k.",
+      "ground_truth_decisao": "Risco Médio",
+      "motivo_esperado": "Faturamento saudável, mas alavancagem e atrasos moderados"
+    }
+  ]
+}
