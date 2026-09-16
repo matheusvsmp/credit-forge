@@ -2,7 +2,7 @@
 
 import logging
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json as jsonlogger
 
 
 def configurar_logger(nome: str = "credit_pipeline") -> logging.Logger:

@@ -1,0 +1,104 @@
+<svg width="920" height="900" viewBox="0 0 920 900" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+  </defs>
+
+  <rect width="920" height="900" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="460" y="34" text-anchor="middle" font-size="22" font-weight="700" fill="#1a1a1a">Credit Forge — Arquitetura Enterprise</text>
+  <text x="460" y="56" text-anchor="middle" font-size="13" fill="#666666">Cliente → POST /api/v1/analise (X-API-Key)</text>
+
+  <!-- connector: title to layer 1 -->
+  <line x1="460" y1="62" x2="460" y2="80" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 1: API Gateway -->
+  <g>
+    <rect x="140" y="82" width="640" height="72" rx="10" fill="#e8f1fc" stroke="#3b6fb0" stroke-width="1.5"/>
+    <text x="165" y="108" font-size="15" font-weight="700" fill="#1f4e86">Camada 1 · API Gateway (FastAPI)</text>
+    <text x="165" y="130" font-size="12.5" fill="#334">Auth por API key · Rate limiting (slowapi) · trace_id único</text>
+    <text x="745" y="140" text-anchor="end" font-size="11.5" font-family="Consolas, monospace" fill="#3b6fb0">api/</text>
+  </g>
+  <line x1="460" y1="154" x2="460" y2="176" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 2: Orchestration -->
+  <g>
+    <rect x="140" y="178" width="640" height="72" rx="10" fill="#e7f6ec" stroke="#2f9e52" stroke-width="1.5"/>
+    <text x="165" y="204" font-size="15" font-weight="700" fill="#1c6b37">Camada 2 · Orquestração (LangGraph + resiliência)</text>
+    <text x="165" y="226" font-size="12.5" fill="#334">Circuit Breaker (CLOSED / OPEN / HALF_OPEN) · Retry com backoff exponencial</text>
+    <text x="745" y="236" text-anchor="end" font-size="11.5" font-family="Consolas, monospace" fill="#2f9e52">orchestration/</text>
+  </g>
+  <line x1="460" y1="250" x2="460" y2="272" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 3: Agents -->
+  <g>
+    <rect x="140" y="274" width="640" height="72" rx="10" fill="#fdece3" stroke="#c9601e" stroke-width="1.5"/>
+    <text x="165" y="300" font-size="15" font-weight="700" fill="#93400f">Camada 3 · Agentes (Extrator → Validador → Decisão)</text>
+    <text x="165" y="322" font-size="12.5" fill="#334">Model routing: Haiku (simples) / Sonnet 5 (complexo ou crítico)</text>
+    <text x="745" y="332" text-anchor="end" font-size="11.5" font-family="Consolas, monospace" fill="#c9601e">agents/</text>
+  </g>
+  <line x1="460" y1="346" x2="460" y2="368" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 4: Observability -->
+  <g>
+    <rect x="140" y="370" width="640" height="72" rx="10" fill="#f1ecfb" stroke="#7248b5" stroke-width="1.5"/>
+    <text x="165" y="396" font-size="15" font-weight="700" fill="#4b2d80">Camada 4 · Observabilidade (OpenTelemetry)</text>
+    <text x="165" y="418" font-size="12.5" fill="#334">Spans aninhados por agente · Métricas · Exporta para o Jaeger</text>
+    <text x="745" y="428" text-anchor="end" font-size="11.5" font-family="Consolas, monospace" fill="#7248b5">observability/</text>
+  </g>
+  <line x1="460" y1="442" x2="460" y2="464" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 5: Persistence -->
+  <g>
+    <rect x="140" y="466" width="640" height="72" rx="10" fill="#e6f4f3" stroke="#1f8a80" stroke-width="1.5"/>
+    <text x="165" y="492" font-size="15" font-weight="700" fill="#155d56">Camada 5 · Persistência (PostgreSQL)</text>
+    <text x="165" y="514" font-size="12.5" fill="#334">agent_traces (auditoria) · token_usage (billing)</text>
+    <text x="745" y="524" text-anchor="end" font-size="11.5" font-family="Consolas, monospace" fill="#1f8a80">persistence/</text>
+  </g>
+
+  <!-- split connectors to 6a / 6b -->
+  <line x1="460" y1="538" x2="460" y2="556" stroke="#555" stroke-width="2"/>
+  <line x1="290" y1="556" x2="630" y2="556" stroke="#555" stroke-width="2"/>
+  <line x1="290" y1="556" x2="290" y2="574" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="630" y1="556" x2="630" y2="574" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 6a: Cache -->
+  <g>
+    <rect x="140" y="576" width="300" height="80" rx="10" fill="#fdf3e1" stroke="#c99a1e" stroke-width="1.5"/>
+    <text x="163" y="602" font-size="14.5" font-weight="700" fill="#8a6710">Camada 6a · Cache (Redis)</text>
+    <text x="163" y="623" font-size="12" fill="#334">Evita rechamar a API para o mesmo</text>
+    <text x="163" y="639" font-size="12" fill="#334">prompt + modelo (TTL)</text>
+    <text x="425" y="649" text-anchor="end" font-size="11" font-family="Consolas, monospace" fill="#c99a1e">persistence/cache.py</text>
+  </g>
+
+  <!-- Layer 6b: Alerts -->
+  <g>
+    <rect x="480" y="576" width="300" height="80" rx="10" fill="#fdece7" stroke="#c3402f" stroke-width="1.5"/>
+    <text x="503" y="602" font-size="14.5" font-weight="700" fill="#8a2a1d">Camada 6b · Alertas</text>
+    <text x="503" y="623" font-size="12" fill="#334">Taxa de erro · spike de latência ·</text>
+    <text x="503" y="639" font-size="12" fill="#334">consumo de orçamento (70% / 90%)</text>
+    <text x="765" y="649" text-anchor="end" font-size="11" font-family="Consolas, monospace" fill="#c3402f">observability/alerts.py</text>
+  </g>
+
+  <!-- converge to layer 7 -->
+  <line x1="290" y1="656" x2="290" y2="674" stroke="#555" stroke-width="2"/>
+  <line x1="630" y1="656" x2="630" y2="674" stroke="#555" stroke-width="2"/>
+  <line x1="290" y1="674" x2="630" y2="674" stroke="#555" stroke-width="2"/>
+  <line x1="460" y1="674" x2="460" y2="692" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Layer 7: Visualization -->
+  <g>
+    <rect x="140" y="694" width="640" height="72" rx="10" fill="#e8f1fc" stroke="#3b6fb0" stroke-width="1.5"/>
+    <text x="165" y="720" font-size="15" font-weight="700" fill="#1f4e86">Camada 7 · Visualização (Jaeger UI)</text>
+    <text x="165" y="742" font-size="12.5" fill="#334">Traces distribuídos, waterfall por requisição — localhost:16686</text>
+  </g>
+
+  <!-- Footer: test discipline note -->
+  <rect x="140" y="790" width="640" height="70" rx="10" fill="#f7f7f7" stroke="#bbbbbb" stroke-width="1"/>
+  <text x="460" y="816" text-anchor="middle" font-size="12.5" font-weight="600" fill="#333">Cada camada tem testes unitários rápidos (sem Docker)</text>
+  <text x="460" y="836" text-anchor="middle" font-size="12.5" fill="#333">+ testes de integração reais contra Postgres/Redis, pulados automaticamente se indisponíveis</text>
+
+  <text x="460" y="885" text-anchor="middle" font-size="11" fill="#999">docs/architecture.svg</text>
+</svg>

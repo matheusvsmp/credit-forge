@@ -4,7 +4,7 @@ import json
 from collections import Counter
 
 from evaluation.metrics import calcular_metricas
-from main import construir_grafo, processar_documento
+from orchestration.graph import construir_grafo, processar_documento
 from observability.tracking import estimar_custo
 
 

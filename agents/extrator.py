@@ -5,14 +5,14 @@ Duas versões:
 - agente_extrator_real: chamada real à API da Anthropic (Etapa 13).
 """
 
-import json
 import re
 
 import anthropic
 
-from agents.llm_utils import MODEL_ID, limpar_json_da_resposta
+from agents.base import LLMAgent
+from agents.llm_utils import MODEL_ID
 from data.schemas import ExtractionResult
-from observability.tracking import VerificadorOrcamento, estimar_custo
+from observability.tracking import VerificadorOrcamento
 
 SYSTEM_PROMPT_EXTRATOR = """Você é um agente extrator especializado em análise de crédito B2B.
 Extraia os campos estruturados do documento fornecido pelo usuário.
@@ -85,12 +85,31 @@ def agente_extrator_mock(documento: str) -> ExtractionResult:
     )
 
 
+class ExtratorAgent(LLMAgent):
+    """Agente real de extração -- infraestrutura de chamada vem de LLMAgent."""
+
+    system_prompt = SYSTEM_PROMPT_EXTRATOR
+    result_model = ExtractionResult
+    # Sonnet 5 tende a ser mais verboso (ex: nomes completos, mais cuidado
+    # com casos ambíguos) do que Haiku -- teto maior evita truncamento.
+    max_tokens_outros_modelos = 600
+
+    def montar_conteudo(self, documento: str, contexto_memoria: str = "") -> str:
+        if contexto_memoria:
+            return (
+                f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
+                f"[Documento atual a analisar]:\n{documento}"
+            )
+        return f"Analise:\n{documento}"
+
+
 def agente_extrator_real(
     documento: str,
     client: anthropic.Anthropic,
     verificador: VerificadorOrcamento,
     contexto_memoria: str = "",
     model_id: str = MODEL_ID,
+    cache=None,
 ) -> tuple[ExtractionResult, dict]:
     """Extrai campos estruturados chamando o Claude de verdade.
 
@@ -107,46 +126,10 @@ def agente_extrator_real(
 
     `model_id` (opcional): por padrão usa Haiku 4.5; o Model Router
     (agents/routing.py) pode passar "claude-sonnet-5" para casos complexos.
+
+    `cache` (opcional): um PromptCacheBackend (Etapa 37) -- por padrão
+    `None` (cache desligado), para preservar o comportamento exato dos
+    grafos já validados.
     """
-    conteudo = f"Analise:\n{documento}"
-    if contexto_memoria:
-        conteudo = (
-            f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
-            f"[Documento atual a analisar]:\n{documento}"
-        )
-
-    # Sonnet 5 tende a ser mais verboso (ex: nomes completos, mais cuidado
-    # com casos ambíguos) do que Haiku -- por isso usamos um teto maior nele,
-    # mesmo a saída sendo "só" um JSON curto.
-    max_tokens = 300 if model_id == MODEL_ID else 600
-
-    response = client.messages.create(
-        model=model_id,
-        max_tokens=max_tokens,
-        system=SYSTEM_PROMPT_EXTRATOR,
-        messages=[{"role": "user", "content": conteudo}],
-    )
-
-    custo = estimar_custo(
-        tokens_input=response.usage.input_tokens,
-        tokens_output=response.usage.output_tokens,
-        model_id=model_id,
-    )
-    verificador.registrar(custo)
-
-    if response.stop_reason == "max_tokens":
-        raise RuntimeError(
-            f"Resposta do extrator ({model_id}) foi cortada por atingir "
-            "max_tokens -- aumente o limite em vez de tentar parsear um "
-            "JSON incompleto."
-        )
-
-    texto = next(b.text for b in response.content if b.type == "text")
-    dados = json.loads(limpar_json_da_resposta(texto))
-    resultado = ExtractionResult(**dados)
-
-    info_uso = {
-        "tokens_input": response.usage.input_tokens,
-        "tokens_output": response.usage.output_tokens,
-    }
-    return resultado, info_uso
+    agente = ExtratorAgent(client, verificador, cache=cache)
+    return agente.executar(documento, contexto_memoria=contexto_memoria, model_id=model_id)

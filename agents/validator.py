@@ -5,13 +5,11 @@ Duas versões:
 - agente_validador_real: chamada real à API da Anthropic (Etapa 14).
 """
 
-import json
-
 import anthropic
 
-from agents.llm_utils import MODEL_ID, limpar_json_da_resposta
+from agents.base import LLMAgent
 from data.schemas import ExtractionResult, ValidationResult
-from observability.tracking import VerificadorOrcamento, estimar_custo
+from observability.tracking import VerificadorOrcamento
 
 # Limiar de alavancagem (dívida / faturamento) acima do qual sinalizamos risco.
 LIMIAR_ALAVANCAGEM = 0.3
@@ -60,6 +58,22 @@ def agente_validador_mock(extracao: ExtractionResult) -> ValidationResult:
     return ValidationResult(coerente=coerente, flags=flags, confianca=confianca)
 
 
+class ValidadorAgent(LLMAgent):
+    """Agente real de validação -- infraestrutura de chamada vem de LLMAgent."""
+
+    system_prompt = SYSTEM_PROMPT_VALIDADOR
+    result_model = ValidationResult
+
+    def montar_conteudo(self, extracao: ExtractionResult, contexto_memoria: str = "") -> str:
+        dados_extraidos = extracao.model_dump_json(indent=2)
+        if contexto_memoria:
+            return (
+                f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
+                f"[Dados extraídos do caso atual]:\n{dados_extraidos}"
+            )
+        return f"Dados extraídos:\n{dados_extraidos}"
+
+
 def agente_validador_real(
     extracao: ExtractionResult,
     client: anthropic.Anthropic,
@@ -71,34 +85,5 @@ def agente_validador_real(
     `contexto_memoria` (opcional): resumo de casos já processados nesta
     mesma sessão (ver agents/memory.py) -- injetado como contexto extra.
     """
-
-    dados_extraidos = extracao.model_dump_json(indent=2)
-    conteudo = f"Dados extraídos:\n{dados_extraidos}"
-    if contexto_memoria:
-        conteudo = (
-            f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
-            f"[Dados extraídos do caso atual]:\n{dados_extraidos}"
-        )
-
-    response = client.messages.create(
-        model=MODEL_ID,
-        max_tokens=300,
-        system=SYSTEM_PROMPT_VALIDADOR,
-        messages=[{"role": "user", "content": conteudo}],
-    )
-
-    custo = estimar_custo(
-        tokens_input=response.usage.input_tokens,
-        tokens_output=response.usage.output_tokens,
-    )
-    verificador.registrar(custo)
-
-    texto = next(b.text for b in response.content if b.type == "text")
-    dados = json.loads(limpar_json_da_resposta(texto))
-    resultado = ValidationResult(**dados)
-
-    info_uso = {
-        "tokens_input": response.usage.input_tokens,
-        "tokens_output": response.usage.output_tokens,
-    }
-    return resultado, info_uso
+    agente = ValidadorAgent(client, verificador)
+    return agente.executar(extracao, contexto_memoria=contexto_memoria)

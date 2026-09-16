@@ -1,0 +1,63 @@
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: credit-forge-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: credit-forge-postgres
+    ports:
+      - "5433:5432"  # 5433 no host -- 5432 já está em uso por outro projeto local
+    environment:
+      - POSTGRES_USER=credit_forge
+      - POSTGRES_PASSWORD=credit_forge
+      - POSTGRES_DB=credit_forge
+    volumes:
+      - credit_forge_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U credit_forge"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: credit-forge-redis
+    ports:
+      - "6380:6379"  # 6380 no host -- 6379 já está em uso por outro projeto local
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: credit-forge-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Dentro da rede do docker-compose, os serviços se enxergam pelo NOME
+      # (não localhost, e nas portas internas -- não as remapeadas no host).
+      - DATABASE_URL=postgresql+psycopg://credit_forge:credit_forge@postgres:5432/credit_forge
+      - REDIS_URL=redis://redis:6379/0
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - API_KEYS=${API_KEYS:-dev-key-local}
+      - ORCAMENTO_MAXIMO_USD=${ORCAMENTO_MAXIMO_USD:-5.0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+
+volumes:
+  credit_forge_pgdata:

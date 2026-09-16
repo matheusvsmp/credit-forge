@@ -9,9 +9,10 @@ import json
 
 import anthropic
 
-from agents.llm_utils import MODEL_ID, limpar_json_da_resposta
+from agents.base import LLMAgent
+from agents.llm_utils import MODEL_ID
 from data.schemas import DecisionResult, ExtractionResult, ReflexaoResult, ValidationResult
-from observability.tracking import VerificadorOrcamento, estimar_custo
+from observability.tracking import VerificadorOrcamento
 
 SYSTEM_PROMPT_DECISAO = """Você é um agente de decisão de crédito B2B, responsável pelo
 veredito final de risco de uma empresa, a partir dos dados extraídos e da validação
@@ -95,6 +96,62 @@ def agente_decisao_mock(
     )
 
 
+class DecisorAgent(LLMAgent):
+    """Agente real de decisão -- usado tanto para a 1ª decisão quanto para a
+    decisão revisada após self-reflection (mesma classe, chamada 2 vezes)."""
+
+    system_prompt = SYSTEM_PROMPT_DECISAO
+    result_model = DecisionResult
+
+    def montar_conteudo(
+        self,
+        extracao: ExtractionResult,
+        validacao: ValidationResult,
+        contexto_memoria: str = "",
+        feedback_revisao: str = "",
+    ) -> str:
+        dados_caso = json.dumps(
+            {"extracao": extracao.model_dump(), "validacao": validacao.model_dump()},
+            ensure_ascii=False,
+            indent=2,
+        )
+        conteudo = dados_caso
+        if contexto_memoria:
+            conteudo = (
+                f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
+                f"[Dados do caso atual]:\n{dados_caso}"
+            )
+        if feedback_revisao:
+            conteudo += f"\n\n[Revisão crítica da sua decisão anterior]:\n{feedback_revisao}"
+        return conteudo
+
+
+class ReflexorAgent(LLMAgent):
+    """Agente crítico: revisa uma decisão já tomada (self-reflection loop)."""
+
+    system_prompt = SYSTEM_PROMPT_REFLEXAO
+    result_model = ReflexaoResult
+    # A lista de achados_contraditorios pode ser longa -- teto maior mesmo
+    # sempre rodando em Haiku (ver Etapa 20: 250 tokens já truncou antes).
+    max_tokens_haiku = 400
+
+    def montar_conteudo(
+        self,
+        extracao: ExtractionResult,
+        validacao: ValidationResult,
+        decisao: DecisionResult,
+    ) -> str:
+        return json.dumps(
+            {
+                "extracao": extracao.model_dump(),
+                "validacao": validacao.model_dump(),
+                "decisao_a_revisar": decisao.model_dump(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+
+
 def agente_decisao_real(
     extracao: ExtractionResult,
     validacao: ValidationResult,
@@ -102,55 +159,29 @@ def agente_decisao_real(
     verificador: VerificadorOrcamento,
     contexto_memoria: str = "",
     feedback_revisao: str = "",
+    model_id: str = MODEL_ID,
 ) -> tuple[DecisionResult, dict]:
-    """Calcula a decisão final de risco chamando o Claude (Haiku 4.5) de verdade.
+    """Calcula a decisão final de risco chamando o Claude de verdade.
 
     `contexto_memoria` (opcional): resumo de casos já processados nesta
     mesma sessão (ver agents/memory.py) -- injetado como contexto extra.
 
     `feedback_revisao` (opcional): crítica de uma reflexão anterior (ver
     agente_decisao_com_reflexao_real) -- pede para reconsiderar a decisão.
+
+    `model_id` (opcional): por padrão usa Haiku 4.5 (mesmo comportamento da
+    Etapa 15). A Etapa 30 passa "claude-sonnet-5" explicitamente no grafo
+    avançado -- decisões de crédito são consideradas críticas o bastante
+    para justificar o modelo mais capaz sempre, não só por complexidade.
     """
-
-    dados_caso = json.dumps(
-        {
-            "extracao": extracao.model_dump(),
-            "validacao": validacao.model_dump(),
-        },
-        ensure_ascii=False,
-        indent=2,
+    agente = DecisorAgent(client, verificador)
+    return agente.executar(
+        extracao,
+        validacao,
+        contexto_memoria=contexto_memoria,
+        feedback_revisao=feedback_revisao,
+        model_id=model_id,
     )
-    conteudo = dados_caso
-    if contexto_memoria:
-        conteudo = (
-            f"[Contexto de casos já analisados nesta sessão]:\n{contexto_memoria}\n\n"
-            f"[Dados do caso atual]:\n{dados_caso}"
-        )
-    if feedback_revisao:
-        conteudo += f"\n\n[Revisão crítica da sua decisão anterior]:\n{feedback_revisao}"
-
-    response = client.messages.create(
-        model=MODEL_ID,
-        max_tokens=300,
-        system=SYSTEM_PROMPT_DECISAO,
-        messages=[{"role": "user", "content": conteudo}],
-    )
-
-    custo = estimar_custo(
-        tokens_input=response.usage.input_tokens,
-        tokens_output=response.usage.output_tokens,
-    )
-    verificador.registrar(custo)
-
-    texto = next(b.text for b in response.content if b.type == "text")
-    dados = json.loads(limpar_json_da_resposta(texto))
-    resultado = DecisionResult(**dados)
-
-    info_uso = {
-        "tokens_input": response.usage.input_tokens,
-        "tokens_output": response.usage.output_tokens,
-    }
-    return resultado, info_uso
 
 
 def agente_decisao_com_reflexao_real(
@@ -159,6 +190,7 @@ def agente_decisao_com_reflexao_real(
     client: anthropic.Anthropic,
     verificador: VerificadorOrcamento,
     contexto_memoria: str = "",
+    model_id: str = MODEL_ID,
 ) -> tuple[DecisionResult, ReflexaoResult, dict]:
     """Decide, depois critica a própria decisão (self-reflection loop).
 
@@ -166,47 +198,22 @@ def agente_decisao_com_reflexao_real(
     o feedback anexado (loop limitado a 1 correção -- nunca infinito) e usa
     esse resultado como final.
 
+    `model_id` (opcional): modelo usado nas 2 chamadas de DECISÃO (não na
+    crítica do Reflexor, que fica sempre em Haiku -- criticar é mais barato
+    que decidir). Ver docstring de agente_decisao_real.
+
     Devolve (decisao_final, reflexao, info_uso_total) -- info_uso_total soma
     os tokens de TODAS as chamadas envolvidas (1 a 3, dependendo do caso).
     """
-    decisao_inicial, uso1 = agente_decisao_real(
-        extracao, validacao, client, verificador, contexto_memoria=contexto_memoria
-    )
+    decisor = DecisorAgent(client, verificador)
+    reflexor = ReflexorAgent(client, verificador)
 
-    contexto_reflexao = json.dumps(
-        {
-            "extracao": extracao.model_dump(),
-            "validacao": validacao.model_dump(),
-            "decisao_a_revisar": decisao_inicial.model_dump(),
-        },
-        ensure_ascii=False,
-        indent=2,
+    decisao_inicial, uso1 = decisor.executar(
+        extracao, validacao, contexto_memoria=contexto_memoria, model_id=model_id
     )
-    response2 = client.messages.create(
-        model=MODEL_ID,
-        max_tokens=400,
-        system=SYSTEM_PROMPT_REFLEXAO,
-        messages=[{"role": "user", "content": contexto_reflexao}],
-    )
-    custo2 = estimar_custo(
-        tokens_input=response2.usage.input_tokens,
-        tokens_output=response2.usage.output_tokens,
-    )
-    verificador.registrar(custo2)
-    if response2.stop_reason == "max_tokens":
-        raise RuntimeError(
-            "Resposta da reflexão foi cortada por atingir max_tokens -- "
-            "aumente o limite em vez de tentar parsear um JSON incompleto."
-        )
-    texto2 = next(b.text for b in response2.content if b.type == "text")
-    reflexao = ReflexaoResult(**json.loads(limpar_json_da_resposta(texto2)))
+    reflexao, uso2 = reflexor.executar(extracao, validacao, decisao_inicial)
 
-    uso2 = {
-        "tokens_input": response2.usage.input_tokens,
-        "tokens_output": response2.usage.output_tokens,
-    }
     uso3 = {"tokens_input": 0, "tokens_output": 0}
-
     decisao_final = decisao_inicial
     if reflexao.recomendacao == "revisar":
         feedback = (
@@ -215,13 +222,12 @@ def agente_decisao_com_reflexao_real(
             f"problemas: {reflexao.achados_contraditorios}. Reconsidere os dados e "
             f"responda com uma nova decisão final."
         )
-        decisao_final, uso3 = agente_decisao_real(
+        decisao_final, uso3 = decisor.executar(
             extracao,
             validacao,
-            client,
-            verificador,
             contexto_memoria=contexto_memoria,
             feedback_revisao=feedback,
+            model_id=model_id,
         )
 
     info_uso_total = {
